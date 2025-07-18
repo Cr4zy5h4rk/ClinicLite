@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useState, useEffect } from "react";
 // Import AuthProvider from its module (adjust the path as needed)
 import { AuthProvider } from "./hooks/useAuthContext";
@@ -37,8 +37,10 @@ import {
   CheckCircle, 
   AlertCircle, 
   Loader2,
-  RefreshCw 
+  RefreshCw,
+  Trash2
 } from "lucide-react";
+import ConsultationsList from "./pages/ConsultationsList";
 
 const queryClient = new QueryClient();
 
@@ -260,6 +262,7 @@ function usePouchDB() {
   };
 
   const forceSync = async () => {
+    console.log('Force sync lancee');
     try {
       setConnectionStatus(prev => ({
         ...prev,
@@ -268,6 +271,34 @@ function usePouchDB() {
       await pouchService.forceSyncWithBackend();
     } catch (error) {
       console.error('Erreur synchronisation forcée:', error);
+      setConnectionStatus(prev => ({
+        ...prev,
+        syncStatus: 'error'
+      }));
+    }
+  };
+
+  const forceFullSync = async () => {
+    console.log('Force full sync demandée');
+    try {
+      setConnectionStatus(prev => ({
+        ...prev,
+        syncStatus: 'syncing'
+      }));
+      
+      const result = await pouchService.forceFullSync();
+      
+      if (result) {
+        // Mettre à jour les stats après la synchronisation complète
+        setConnectionStatus(prev => ({
+          ...prev,
+          syncStatus: 'synced',
+          lastSync: new Date().toISOString()
+        }));
+        updatePendingChanges();
+      }
+    } catch (error) {
+      console.error('Erreur synchronisation complète forcée:', error);
       setConnectionStatus(prev => ({
         ...prev,
         syncStatus: 'error'
@@ -310,14 +341,16 @@ function usePouchDB() {
     appInitialized,
     initError,
     connectionStatus,
-    forceSync
+    forceSync,
+    forceFullSync
   };
 }
 
 // Composant pour la barre de statut de synchronisation
-function SyncStatusBar({ connectionStatus, onForceSync }: { 
+function SyncStatusBar({ connectionStatus, onForceSync, onForceFullSync }: { 
   connectionStatus: ConnectionStatus; 
-  onForceSync: () => void; 
+  onForceSync: () => void;
+  onForceFullSync: () => void;
 }) {
   const getSyncStatusBadge = () => {
     switch (connectionStatus.syncStatus) {
@@ -361,87 +394,149 @@ function SyncStatusBar({ connectionStatus, onForceSync }: {
     }
   };
 
+  const handleForceFullSync = () => {
+    if (confirm("ATTENTION: Cette action va vider la base de données locale et recharger toutes les données depuis le serveur. Les données non synchronisées seront perdues. Voulez-vous continuer?")) {
+      onForceFullSync();
+    }
+  };
+
   return (
-    // Modifier les classes pour ajuster la largeur et le padding
-    <div className="bg-white border-b border-slate-200 px-4 py-2 ml-64"> {/* Ajouter ml-64 pour compenser la largeur du menu */}
-      <div className="flex items-center justify-between w-full">  {/* Remplacer max-w-7xl par w-full */}
-        <div className="flex items-center gap-4 overflow-x-auto"> {/* Ajouter overflow-x-auto pour gérer le dépassement */}
-          {/* Status de connexion */}
-          <div className="flex items-center gap-1">
-            {connectionStatus.isOnline ? (
-              <div className="flex items-center gap-1 text-green-600">
-                <Wifi className="w-4 h-4" />
-                <span className="text-sm">En ligne</span>
+    <>
+      {/* Version desktop */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2 lg:block hidden">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-4 overflow-x-auto">
+            {/* Status de connexion */}
+            <div className="flex items-center gap-1">
+              {connectionStatus.isOnline ? (
+                <div className="flex items-center gap-1 text-green-600">
+                  <Wifi className="w-4 h-4" />
+                  <span className="text-sm">En ligne</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 text-red-600">
+                  <WifiOff className="w-4 h-4" />
+                  <span className="text-sm">Hors ligne</span>
+                </div>
+              )}
+            </div>
+
+            {/* Badge de statut de synchronisation */}
+            {getSyncStatusBadge()}
+
+            {/* Badges des changements en attente */}
+            {connectionStatus.pendingChanges.total > 0 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">
+                  <Database className="w-3 h-3 mr-1" />
+                  {connectionStatus.pendingChanges.total} en attente
+                </Badge>
+                {/* Détails des changements en attente */}
+                <div className="flex gap-1">
+                  {connectionStatus.pendingChanges.patients > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Patients: {connectionStatus.pendingChanges.patients}
+                    </Badge>
+                  )}
+                  {connectionStatus.pendingChanges.consultations > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Consultations: {connectionStatus.pendingChanges.consultations}
+                    </Badge>
+                  )}
+                  {connectionStatus.pendingChanges.antecedents > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Antécédents: {connectionStatus.pendingChanges.antecedents}
+                    </Badge>
+                  )}
+                  {connectionStatus.pendingChanges.vaccinations > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Vaccinations: {connectionStatus.pendingChanges.vaccinations}
+                    </Badge>
+                  )}
+                  {connectionStatus.pendingChanges.notes > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Notes: {connectionStatus.pendingChanges.notes}
+                    </Badge>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center gap-1 text-red-600">
-                <WifiOff className="w-4 h-4" />
-                <span className="text-sm">Hors ligne</span>
-              </div>
+            )}
+
+            {/* Dernière synchronisation */}
+            {connectionStatus.lastSync && (
+              <span className="text-xs text-slate-500">
+                Dernière sync: {new Date(connectionStatus.lastSync).toLocaleString()}
+              </span>
             )}
           </div>
 
-          {/* Badge de statut de synchronisation */}
-          {getSyncStatusBadge()}
+          <div className="flex gap-2">
+            {/* Bouton de synchronisation forcée */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onForceSync}
+              disabled={!connectionStatus.isOnline || connectionStatus.syncStatus === 'syncing'}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${connectionStatus.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              Sync
+            </Button>
+            
+            {/* Bouton de synchronisation complète */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleForceFullSync}
+              disabled={!connectionStatus.isOnline || connectionStatus.syncStatus === 'syncing'}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Reset & Sync
+            </Button>
+          </div>
+        </div>
+      </div>
 
-          {/* Badges des changements en attente */}
-          {connectionStatus.pendingChanges.total > 0 && (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                <Database className="w-3 h-3 mr-1" />
-                {connectionStatus.pendingChanges.total} en attente
-              </Badge>
-              {/* Détails des changements en attente */}
-              <div className="flex gap-1">
-                {connectionStatus.pendingChanges.patients > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    Patients: {connectionStatus.pendingChanges.patients}
-                  </Badge>
-                )}
-                {connectionStatus.pendingChanges.consultations > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    Consultations: {connectionStatus.pendingChanges.consultations}
-                  </Badge>
-                )}
-                {connectionStatus.pendingChanges.antecedents > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    Antécédents: {connectionStatus.pendingChanges.antecedents}
-                  </Badge>
-                )}
-                {connectionStatus.pendingChanges.vaccinations > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    Vaccinations: {connectionStatus.pendingChanges.vaccinations}
-                  </Badge>
-                )}
-                {connectionStatus.pendingChanges.notes > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    Notes: {connectionStatus.pendingChanges.notes}
-                  </Badge>
-                )}
-              </div>
-            </div>
+      {/* Version mobile - plus compacte */}
+      <div className="bg-white border-b border-slate-200 px-3 py-1 lg:hidden flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {connectionStatus.isOnline ? (
+            <Wifi className="w-4 h-4 text-green-600" />
+          ) : (
+            <WifiOff className="w-4 h-4 text-red-600" />
           )}
-
-          {/* Dernière synchronisation */}
-          {connectionStatus.lastSync && (
-            <span className="text-xs text-slate-500">
-              Dernière sync: {new Date(connectionStatus.lastSync).toLocaleString()}
-            </span>
+          {getSyncStatusBadge()}
+          {connectionStatus.pendingChanges.total > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              <Database className="w-3 h-3 mr-1" />
+              {connectionStatus.pendingChanges.total}
+            </Badge>
           )}
         </div>
-
-        {/* Bouton de synchronisation forcée */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onForceSync}
-          disabled={!connectionStatus.isOnline || connectionStatus.syncStatus === 'syncing'}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${connectionStatus.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-          Sync
-        </Button>
+        
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onForceSync}
+            disabled={!connectionStatus.isOnline || connectionStatus.syncStatus === 'syncing'}
+            className="h-8 w-8 p-0"
+          >
+            <RefreshCw className={`w-4 h-4 ${connectionStatus.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleForceFullSync}
+            disabled={!connectionStatus.isOnline || connectionStatus.syncStatus === 'syncing'}
+            className="h-8 w-8 p-0 text-red-600"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -475,7 +570,7 @@ function ProtectedRoute({ children, allowedRoles = [] }: {
 }
 
 const App = () => {
-  const { appInitialized, initError, connectionStatus, forceSync } = usePouchDB();
+  const { appInitialized, initError, connectionStatus, forceSync, forceFullSync } = usePouchDB();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -493,10 +588,18 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <AppLayout>
-                        <SyncStatusBar 
-                          connectionStatus={connectionStatus} 
-                          onForceSync={forceSync}
-                        />
+                        <div className="w-full">
+                          <SyncStatusBar 
+                            connectionStatus={connectionStatus} 
+                            onForceSync={forceSync}
+                            onForceFullSync={forceFullSync}
+                          />
+                          <div className="py-4">
+                            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                              <Outlet />
+                            </div>
+                          </div>
+                        </div>
                       </AppLayout>
                     </ProtectedRoute>
                   }
@@ -526,9 +629,19 @@ const App = () => {
                       <Consultations />
                     </ProtectedRoute>
                   } />
+                  <Route path="Listconsultations" element={
+                    <ProtectedRoute allowedRoles={['admin', 'medecin']}>
+                      <ConsultationsList />
+                    </ProtectedRoute>
+                  } />
                   <Route path="vaccinations" element={
                     <ProtectedRoute allowedRoles={['admin', 'medecin', 'infirmier']}>
                       <Vaccinations />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="assistant" element={
+                    <ProtectedRoute allowedRoles={['admin', 'medecin', 'infirmier']}>
+                      <Assistant />
                     </ProtectedRoute>
                   } />
                   <Route path="settings" element={

@@ -6,13 +6,14 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Clé secrète pour JWT
 const crypto = require('crypto');
-const JWT_SECRET = crypto.randomBytes(64).toString('hex');
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 const JWT_EXPIRES_IN = '24h';
 
 // Middleware
@@ -20,12 +21,12 @@ app.use(cors());
 app.use(express.json());
 
 // Connexion à la base de données SQLite
-const dbPath = path.join(__dirname, 'hospital.db');
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'hospital.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Erreur lors de la connexion à la base de données:', err.message);
   } else {
-    console.log('Connecté à la base de données SQLite');
+    console.log('Connecté à la base de données SQLite:', dbPath);
   }
 });
 

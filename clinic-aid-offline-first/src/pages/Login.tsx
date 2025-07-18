@@ -235,7 +235,7 @@ export default function Login() {
             <div className="text-center space-y-2">
               <h3 className="font-semibold text-blue-900">Compte de démonstration</h3>
               <div className="text-sm text-blue-800 space-y-1">
-                <p><strong>Email:</strong> admin@cliniclite.com</p>
+                <p><strong>Email:</strong> admin@clinique.com</p>
                 <p><strong>Mot de passe:</strong> admin123</p>
               </div>
               <p className="text-xs text-blue-700">
