@@ -50,344 +50,349 @@ const authenticateToken = (req, res, next) => {
 
 // Création des tables
 const createTables = () => {
-  // Table patients
-  db.run(`
-    CREATE TABLE IF NOT EXISTS patients (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nom TEXT NOT NULL,
-      prenom TEXT NOT NULL,
-      dateNaissance DATE NOT NULL,
-      sexe TEXT CHECK(sexe IN ('M', 'F')) NOT NULL,
-      telephone TEXT,
-      adresse TEXT,
-      profession TEXT,
-      situationMatrimoniale TEXT,
-      contactUrgence TEXT,
-      status TEXT CHECK(status IN ('synced', 'pending', 'offline')) DEFAULT 'synced',
-      numeroPatient TEXT UNIQUE,
-      dateEnregistrement DATE DEFAULT CURRENT_DATE,
-      lastVisit DATE,
-      consultations INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  return new Promise((resolve, reject) => {
+    const tables = [
+      // Table patients
+      `CREATE TABLE IF NOT EXISTS patients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom TEXT NOT NULL,
+        prenom TEXT NOT NULL,
+        dateNaissance DATE NOT NULL,
+        sexe TEXT CHECK(sexe IN ('M', 'F')) NOT NULL,
+        telephone TEXT,
+        adresse TEXT,
+        profession TEXT,
+        situationMatrimoniale TEXT,
+        contactUrgence TEXT,
+        status TEXT CHECK(status IN ('synced', 'pending', 'offline')) DEFAULT 'synced',
+        numeroPatient TEXT UNIQUE,
+        dateEnregistrement DATE DEFAULT CURRENT_DATE,
+        lastVisit DATE,
+        consultations INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`,
+      
+      // Table antecedents
+      `CREATE TABLE IF NOT EXISTS antecedents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patientId INTEGER NOT NULL,
+        type TEXT CHECK(type IN ('Médical', 'Chirurgical', 'Familial', 'Allergique')) NOT NULL,
+        description TEXT NOT NULL,
+        date DATE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
+      )`,
+      
+      // Table consultations
+      `CREATE TABLE IF NOT EXISTS consultations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patientId INTEGER NOT NULL,
+        date DATE NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        motif TEXT NOT NULL,
+        symptomes TEXT,
+        diagnostic TEXT,
+        traitement TEXT,
+        observations TEXT,
+        duree INTEGER,
+        prochainRdv DATE,
+        medecin TEXT NOT NULL,
+        status TEXT CHECK(status IN ('terminée', 'en_cours', 'programmée')) DEFAULT 'terminée',
+        poids TEXT,
+        taille TEXT,
+        tension TEXT,
+        temperature TEXT,
+        pouls TEXT,
+        frequenceRespiratoire TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
+      )`,
+      
+      // Table vaccinations
+      `CREATE TABLE IF NOT EXISTS vaccinations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patientId INTEGER NOT NULL,
+        vaccin TEXT NOT NULL,
+        lot TEXT,
+        dateAdministration DATE NOT NULL,
+        prochainRappel DATE,
+        status TEXT CHECK(status IN ('à jour', 'bientôt', 'retard')) DEFAULT 'à jour',
+        administrePar TEXT,
+        reactions TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
+      )`,
+      
+      // Table notes
+      `CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patientId INTEGER NOT NULL,
+        date DATE NOT NULL,
+        auteur TEXT NOT NULL,
+        contenu TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
+      )`,
+      
+      // Table users
+      `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT CHECK(role IN ('admin', 'doctor', 'nurse')) NOT NULL,
+        nom TEXT NOT NULL,
+        prenom TEXT NOT NULL,
+        email TEXT UNIQUE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    ];
 
-  // Table antecedents
-  db.run(`
-    CREATE TABLE IF NOT EXISTS antecedents (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      patientId INTEGER NOT NULL,
-      type TEXT CHECK(type IN ('Médical', 'Chirurgical', 'Familial', 'Allergique')) NOT NULL,
-      description TEXT NOT NULL,
-      date DATE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
-    )
-  `);
+    let completed = 0;
+    let hasError = false;
 
-  // Table consultations
-  db.run(`
-    CREATE TABLE IF NOT EXISTS consultations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      patientId INTEGER NOT NULL,
-      date DATE NOT NULL,
-      updated_at DATE NOT NULL DEFAULT CURRENT_DATE,
-      motif TEXT NOT NULL,
-      diagnostic TEXT,
-      medecin TEXT NOT NULL,
-      status TEXT CHECK(status IN ('terminée', 'en_cours', 'programmée')) DEFAULT 'terminée',
-      poids TEXT,
-      taille TEXT,
-      tension TEXT,
-      temperature TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Table vaccinations
-  db.run(`
-    CREATE TABLE IF NOT EXISTS vaccinations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      patientId INTEGER NOT NULL,
-      vaccin TEXT NOT NULL,
-      lot TEXT,
-      dateAdministration DATE NOT NULL,
-      prochainRappel DATE,
-      status TEXT CHECK(status IN ('à jour', 'bientôt', 'retard')) DEFAULT 'à jour',
-      administrePar TEXT,
-      reactions TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Table notes
-  db.run(`
-    CREATE TABLE IF NOT EXISTS notes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      patientId INTEGER NOT NULL,
-      date DATE NOT NULL,
-      auteur TEXT NOT NULL,
-      contenu TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (patientId) REFERENCES patients(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Table users
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      role TEXT CHECK(role IN ('admin', 'doctor', 'nurse')) NOT NULL,
-      nom TEXT NOT NULL,
-      prenom TEXT NOT NULL,
-      email TEXT UNIQUE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  console.log('Tables créées avec succès');
-};
-
-// Insertion des données de test
-const insertTestData = () => {
-  // Patients
-  const patients = [
-    {
-      nom: 'Kouassi',
-      prenom: 'Marie',
-      dateNaissance: '1990-05-15',
-      sexe: 'F',
-      telephone: '+225 07 12 34 56',
-      adresse: 'Abidjan, Cocody',
-      profession: 'Enseignante',
-      situationMatrimoniale: 'Mariée',
-      contactUrgence: '+225 07 98 76 54',
-      status: 'synced',
-      numeroPatient: 'P001234',
-      dateEnregistrement: '2023-06-15',
-      lastVisit: '2024-01-15',
-      consultations: 5
-    },
-    {
-      nom: 'Traore',
-      prenom: 'Ibrahim',
-      dateNaissance: '1985-12-03',
-      sexe: 'M',
-      telephone: '+225 05 98 76 54',
-      adresse: 'Bouaké Centre',
-      profession: 'Commerçant',
-      situationMatrimoniale: 'Marié',
-      contactUrgence: '+225 05 11 22 33',
-      status: 'pending',
-      numeroPatient: 'P001235',
-      dateEnregistrement: '2023-07-20',
-      lastVisit: '2024-01-10',
-      consultations: 12
-    },
-    {
-      nom: 'Kone',
-      prenom: 'Aminata',
-      dateNaissance: '2010-08-22',
-      sexe: 'F',
-      telephone: '+225 01 23 45 67',
-      adresse: 'Yamoussoukro',
-      profession: 'Étudiante',
-      situationMatrimoniale: 'Célibataire',
-      contactUrgence: '+225 01 98 76 54',
-      status: 'offline',
-      numeroPatient: 'P001236',
-      dateEnregistrement: '2023-08-10',
-      lastVisit: '2024-01-08',
-      consultations: 3
-    },
-    {
-      nom: 'Ouattara',
-      prenom: 'Sekou',
-      dateNaissance: '1978-03-10',
-      sexe: 'M',
-      telephone: '+225 07 89 01 23',
-      adresse: 'Man Centre',
-      profession: 'Agriculteur',
-      situationMatrimoniale: 'Marié',
-      contactUrgence: '+225 07 55 44 33',
-      status: 'synced',
-      numeroPatient: 'P001237',
-      dateEnregistrement: '2023-09-05',
-      lastVisit: '2024-01-12',
-      consultations: 8
-    },
-    {
-      nom: 'Fall',
-      prenom: 'Diouma',
-      dateNaissance: '1978-03-10',
-      sexe: 'M',
-      telephone: '+225 07 89 01 23',
-      adresse: 'Man Centre',
-      profession: 'Agriculteur',
-      situationMatrimoniale: 'Marié',
-      contactUrgence: '+225 07 55 44 33',
-      status: 'synced',
-      numeroPatient: 'P001237',
-      dateEnregistrement: '2023-09-05',
-      lastVisit: '2024-01-12',
-      consultations: 8
-    }
-  ];
-
-  // Insertion des patients
-  patients.forEach((patient, index) => {
-    db.run(`
-      INSERT INTO patients (
-        nom, prenom, dateNaissance, sexe, telephone, adresse, profession,
-        situationMatrimoniale, contactUrgence, status, numeroPatient,
-        dateEnregistrement, lastVisit, consultations
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      patient.nom, patient.prenom, patient.dateNaissance, patient.sexe,
-      patient.telephone, patient.adresse, patient.profession,
-      patient.situationMatrimoniale, patient.contactUrgence, patient.status,
-      patient.numeroPatient, patient.dateEnregistrement, patient.lastVisit,
-      patient.consultations
-    ], function(err) {
-      if (err) {
-        console.error('Erreur insertion patient:', err.message);
-      } else {
-        console.log(`Patient ${patient.nom} ${patient.prenom} inséré avec ID: ${this.lastID}`);
-        
-        // Insertion des antécédents pour Marie Kouassi (ID 1)
-        if (index === 0) {
-          const antecedents = [
-            { type: 'Médical', description: 'Hypertension artérielle', date: '2020-03-10' },
-            { type: 'Chirurgical', description: 'Césarienne', date: '2018-12-15' },
-            { type: 'Familial', description: 'Diabète (mère)', date: '2023-01-10' },
-            { type: 'Allergique', description: 'Pénicilline', date: '2019-08-05' }
-          ];
-
-          antecedents.forEach(ant => {
-            db.run(`
-              INSERT INTO antecedents (patientId, type, description, date)
-              VALUES (?, ?, ?, ?)
-            `, [this.lastID, ant.type, ant.description, ant.date]);
-          });
-
-          // Insertion des consultations
-          const consultations = [
-            {
-              date: '2024-01-15',
-              motif: 'Contrôle hypertension',
-              diagnostic: 'HTA bien contrôlée',
-              medecin: 'Dr. Konan',
-              status: 'terminée',
-              poids: '68kg',
-              taille: '165cm',
-              tension: '130/80',
-              temperature: '36.5°C'
-            },
-            {
-              date: '2024-01-08',
-              motif: 'Maux de tête récurrents',
-              diagnostic: 'Céphalées de tension',
-              medecin: 'Dr. Konan',
-              status: 'terminée',
-              poids: '67kg',
-              taille: '165cm',
-              tension: '135/85',
-              temperature: '36.8°C'
-            },
-            {
-              date: '2023-12-20',
-              motif: 'Suivi grossesse',
-              diagnostic: 'Grossesse normale - 32 SA',
-              medecin: 'Dr. Kouamé',
-              status: 'terminée',
-              poids: '72kg',
-              taille: '165cm',
-              tension: '125/75',
-              temperature: '36.6°C'
-            }
-          ];
-
-          consultations.forEach(cons => {
-            db.run(`
-              INSERT INTO consultations (
-                patientId, date, motif, diagnostic, medecin, status,
-                poids, taille, tension, temperature
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-              this.lastID, cons.date, cons.motif, cons.diagnostic,
-              cons.medecin, cons.status, cons.poids, cons.taille,
-              cons.tension, cons.temperature
-            ]);
-          });
-
-          // Insertion des vaccinations
-          const vaccinations = [
-            { vaccin: 'Tétanos', dateAdministration: '2023-05-12', prochainRappel: '2033-05-12', status: 'à jour', administrePar: 'Inf. Diabé' },
-            { vaccin: 'Hépatite B', dateAdministration: '2022-01-15', prochainRappel: '2027-01-15', status: 'à jour', administrePar: 'Dr. Konan' },
-            { vaccin: 'Fièvre jaune', dateAdministration: '2020-08-10', prochainRappel: '2030-08-10', status: 'à jour', administrePar: 'Inf. Kone' },
-            { vaccin: 'COVID-19', dateAdministration: '2023-11-20', prochainRappel: '2024-11-20', status: 'bientôt', administrePar: 'Dr. Kouamé' }
-          ];
-
-          vaccinations.forEach(vacc => {
-            db.run(`
-              INSERT INTO vaccinations (
-                patientId, vaccin, dateAdministration, prochainRappel, status, administrePar
-              ) VALUES (?, ?, ?, ?, ?, ?)
-            `, [this.lastID, vacc.vaccin, vacc.dateAdministration, vacc.prochainRappel, vacc.status, vacc.administrePar]);
-          });
-
-          // Insertion des notes
-          const notes = [
-            { date: '2024-01-15', auteur: 'Dr. Konan', contenu: 'Patiente très coopérative. Bon suivi du traitement antihypertenseur.' },
-            { date: '2024-01-08', auteur: 'Inf. Diabé', contenu: 'Education thérapeutique réalisée sur la gestion du stress.' }
-          ];
-
-          notes.forEach(note => {
-            db.run(`
-              INSERT INTO notes (patientId, date, auteur, contenu)
-              VALUES (?, ?, ?, ?)
-            `, [this.lastID, note.date, note.auteur, note.contenu]);
-          });
+    tables.forEach((tableSQL, index) => {
+      db.run(tableSQL, (err) => {
+        if (err && !hasError) {
+          hasError = true;
+          console.error(`Erreur création table ${index + 1}:`, err.message);
+          reject(err);
+        } else {
+          completed++;
+          if (completed === tables.length && !hasError) {
+            console.log('Toutes les tables ont été créées avec succès');
+            resolve();
+          }
         }
-      }
+      });
     });
   });
 };
 
-// Insertion d'utilisateurs de test
-const insertTestUsers = async () => {
-  const users = [
+const insertTestData = () => {
+  return new Promise((resolve, reject) => {
+    // Patients
+    const patients = [
+      {
+        nom: 'Kouassi',
+        prenom: 'Marie',
+        dateNaissance: '1990-05-15',
+        sexe: 'F',
+        telephone: '+225 07 12 34 56',
+        adresse: 'Abidjan, Cocody',
+        profession: 'Enseignante',
+        situationMatrimoniale: 'Mariée',
+        contactUrgence: '+225 07 98 76 54',
+        status: 'synced',
+        numeroPatient: 'P001234',
+        dateEnregistrement: '2023-06-15',
+        lastVisit: '2024-01-15',
+        consultations: 5
+      },
+      {
+        nom: 'Traore',
+        prenom: 'Ibrahim',
+        dateNaissance: '1985-12-03',
+        sexe: 'M',
+        telephone: '+225 05 98 76 54',
+        adresse: 'Bouaké Centre',
+        profession: 'Commerçant',
+        situationMatrimoniale: 'Marié',
+        contactUrgence: '+225 05 11 22 33',
+        status: 'pending',
+        numeroPatient: 'P001235',
+        dateEnregistrement: '2023-07-20',
+        lastVisit: '2024-01-10',
+        consultations: 12
+      },
+      {
+        nom: 'Kone',
+        prenom: 'Aminata',
+        dateNaissance: '2010-08-22',
+        sexe: 'F',
+        telephone: '+225 01 23 45 67',
+        adresse: 'Yamoussoukro',
+        profession: 'Étudiante',
+        situationMatrimoniale: 'Célibataire',
+        contactUrgence: '+225 01 98 76 54',
+        status: 'offline',
+        numeroPatient: 'P001236',
+        dateEnregistrement: '2023-08-10',
+        lastVisit: '2024-01-08',
+        consultations: 3
+      },
+      {
+        nom: 'Ouattara',
+        prenom: 'Sekou',
+        dateNaissance: '1978-03-10',
+        sexe: 'M',
+        telephone: '+225 07 89 01 23',
+        adresse: 'Man Centre',
+        profession: 'Agriculteur',
+        situationMatrimoniale: 'Marié',
+        contactUrgence: '+225 07 55 44 33',
+        status: 'synced',
+        numeroPatient: 'P001237',
+        dateEnregistrement: '2023-09-05',
+        lastVisit: '2024-01-12',
+        consultations: 8
+      },
+      {
+        nom: 'Fall',
+        prenom: 'Diouma',
+        dateNaissance: '1978-03-10',
+        sexe: 'M',
+        telephone: '+225 07 89 01 23',
+        adresse: 'Man Centre',
+        profession: 'Agriculteur',
+        situationMatrimoniale: 'Marié',
+        contactUrgence: '+225 07 55 44 33',
+        status: 'synced',
+        numeroPatient: 'P001238', // Changé pour éviter les doublons
+        dateEnregistrement: '2023-09-05',
+        lastVisit: '2024-01-12',
+        consultations: 8
+      }
+    ];
+
+    let patientsInserted = 0;
+    let hasError = false;
+
+    // Insertion des patients
+    patients.forEach((patient, index) => {
+      db.run(`
+        INSERT INTO patients (
+          nom, prenom, dateNaissance, sexe, telephone, adresse, profession,
+          situationMatrimoniale, contactUrgence, status, numeroPatient,
+          dateEnregistrement, lastVisit, consultations
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        patient.nom, patient.prenom, patient.dateNaissance, patient.sexe,
+        patient.telephone, patient.adresse, patient.profession,
+        patient.situationMatrimoniale, patient.contactUrgence, patient.status,
+        patient.numeroPatient, patient.dateEnregistrement, patient.lastVisit,
+        patient.consultations
+      ], function(err) {
+        if (err && !hasError) {
+          hasError = true;
+          console.error('Erreur insertion patient:', err.message);
+          reject(err);
+        } else {
+          console.log(`Patient ${patient.nom} ${patient.prenom} inséré avec ID: ${this.lastID}`);
+          patientsInserted++;
+          
+          // Insertion des données additionnelles pour Marie Kouassi (premier patient)
+          if (index === 0) {
+            insertAdditionalData(this.lastID);
+          }
+
+          if (patientsInserted === patients.length && !hasError) {
+            resolve();
+          }
+        }
+      });
+    });
+  });
+};
+
+// Fonction pour insérer les données additionnelles (antécédents, consultations, etc.)
+const insertAdditionalData = (patientId) => {
+  // Insertion des antécédents
+  const antecedents = [
+    { type: 'Médical', description: 'Hypertension artérielle', date: '2020-03-10' },
+    { type: 'Chirurgical', description: 'Césarienne', date: '2018-12-15' },
+    { type: 'Familial', description: 'Diabète (mère)', date: '2023-01-10' },
+    { type: 'Allergique', description: 'Pénicilline', date: '2019-08-05' }
+  ];
+
+  antecedents.forEach(ant => {
+    db.run(`
+      INSERT INTO antecedents (patientId, type, description, date)
+      VALUES (?, ?, ?, ?)
+    `, [patientId, ant.type, ant.description, ant.date]);
+  });
+
+  // Insertion des consultations
+  const consultations = [
     {
-      username: 'admin',
-      password: await bcrypt.hash('admin123', 10),
-      role: 'admin',
-      nom: 'Admin',
-      prenom: 'System',
-      email: 'admin@clinique.com'
+      date: '2024-01-15',
+      motif: 'Contrôle hypertension',
+      diagnostic: 'HTA bien contrôlée',
+      medecin: 'Dr. Konan',
+      status: 'terminée',
+      poids: '68kg',
+      taille: '165cm',
+      tension: '130/80',
+      temperature: '36.5°C'
     },
     {
-      username: 'drkonan',
-      password: await bcrypt.hash('doctor123', 10),
-      role: 'doctor',
-      nom: 'Konan',
-      prenom: 'Pierre',
-      email: 'drkonan@clinique.com'
+      date: '2024-01-08',
+      motif: 'Maux de tête récurrents',
+      diagnostic: 'Céphalées de tension',
+      medecin: 'Dr. Konan',
+      status: 'terminée',
+      poids: '67kg',
+      taille: '165cm',
+      tension: '135/85',
+      temperature: '36.8°C'
+    },
+    {
+      date: '2023-12-20',
+      motif: 'Suivi grossesse',
+      diagnostic: 'Grossesse normale - 32 SA',
+      medecin: 'Dr. Kouamé',
+      status: 'terminée',
+      poids: '72kg',
+      taille: '165cm',
+      tension: '125/75',
+      temperature: '36.6°C'
     }
   ];
 
-  users.forEach(user => {
+  consultations.forEach(cons => {
     db.run(`
-      INSERT INTO users (username, password, role, nom, prenom, email)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [user.username, user.password, user.role, user.nom, user.prenom, user.email]);
+      INSERT INTO consultations (
+        patientId, date, motif, diagnostic, medecin, status,
+        poids, taille, tension, temperature
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      patientId, cons.date, cons.motif, cons.diagnostic,
+      cons.medecin, cons.status, cons.poids, cons.taille,
+      cons.tension, cons.temperature
+    ]);
+  });
+
+  // Insertion des vaccinations
+  const vaccinations = [
+    { vaccin: 'Tétanos', dateAdministration: '2023-05-12', prochainRappel: '2033-05-12', status: 'à jour', administrePar: 'Inf. Diabé' },
+    { vaccin: 'Hépatite B', dateAdministration: '2022-01-15', prochainRappel: '2027-01-15', status: 'à jour', administrePar: 'Dr. Konan' },
+    { vaccin: 'Fièvre jaune', dateAdministration: '2020-08-10', prochainRappel: '2030-08-10', status: 'à jour', administrePar: 'Inf. Kone' },
+    { vaccin: 'COVID-19', dateAdministration: '2023-11-20', prochainRappel: '2024-11-20', status: 'bientôt', administrePar: 'Dr. Kouamé' }
+  ];
+
+  vaccinations.forEach(vacc => {
+    db.run(`
+      INSERT INTO vaccinations (
+        patientId, vaccin, dateAdministration, prochainRappel, status, administrePar
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `, [patientId, vacc.vaccin, vacc.dateAdministration, vacc.prochainRappel, vacc.status, vacc.administrePar]);
+  });
+
+  // Insertion des notes
+  const notes = [
+    { date: '2024-01-15', auteur: 'Dr. Konan', contenu: 'Patiente très coopérative. Bon suivi du traitement antihypertenseur.' },
+    { date: '2024-01-08', auteur: 'Inf. Diabé', contenu: 'Education thérapeutique réalisée sur la gestion du stress.' }
+  ];
+
+  notes.forEach(note => {
+    db.run(`
+      INSERT INTO notes (patientId, date, auteur, contenu)
+      VALUES (?, ?, ?, ?)
+    `, [patientId, note.date, note.auteur, note.contenu]);
   });
 };
+
 
 // Routes API
 
@@ -953,49 +958,90 @@ function addCertificateFooter(doc) {
     .text('Date d\'émission: ' + new Date().toLocaleDateString('fr-FR'), 400, footerY + 60, { align: 'right' });
 }
 
-// Modification de la table consultations pour ajouter les nouveaux champs
-const updateConsultationsTable = () => {
-  // Ajouter les colonnes manquantes si elles n'existent pas
-  const newColumns = [
-    { name: 'symptomes', type: 'TEXT' },
-    { name: 'traitement', type: 'TEXT' },
-    { name: 'observations', type: 'TEXT' },
-    { name: 'duree', type: 'INTEGER' },
-    { name: 'prochainRdv', type: 'DATE' },
-    { name: 'pouls', type: 'TEXT' },
-    { name: 'frequenceRespiratoire', type: 'TEXT' },
-    { name: 'updated_at', type: 'DATETIME DEFAULT CURRENT_TIMESTAMP' }
-  ];
-  
-  newColumns.forEach(column => {
-    db.run(`ALTER TABLE consultations ADD COLUMN ${column.name} ${column.type}`, (err) => {
-      if (err && !err.message.includes('duplicate column name')) {
-        console.error(`Erreur ajout colonne ${column.name}:`, err.message);
-      }
-    });
+// Insertion d'utilisateurs de test
+const insertTestUsers = async () => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const users = [
+        {
+          username: 'admin',
+          password: await bcrypt.hash('admin123', 10),
+          role: 'admin',
+          nom: 'Admin',
+          prenom: 'System',
+          email: 'admin@clinique.com'
+        },
+        {
+          username: 'drkonan',
+          password: await bcrypt.hash('doctor123', 10),
+          role: 'doctor',
+          nom: 'Konan',
+          prenom: 'Pierre',
+          email: 'drkonan@clinique.com'
+        }
+      ];
+
+      let usersInserted = 0;
+      let hasError = false;
+
+      users.forEach(user => {
+        db.run(`
+          INSERT INTO users (username, password, role, nom, prenom, email)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [user.username, user.password, user.role, user.nom, user.prenom, user.email], function(err) {
+          if (err && !hasError) {
+            hasError = true;
+            console.error('Erreur insertion utilisateur:', err.message);
+            reject(err);
+          } else {
+            console.log(`Utilisateur ${user.username} inséré avec ID: ${this.lastID}`);
+            usersInserted++;
+            if (usersInserted === users.length && !hasError) {
+              resolve();
+            }
+          }
+        });
+      });
+    } catch (error) {
+      reject(error);
+    }
   });
 };
 
-// Appeler la fonction de mise à jour lors de l'initialisation
-updateConsultationsTable();
+// Initialisation de la base de données avec gestion asynchrone
+const initDatabase = async () => {
+  try {
+    // Étape 1: Créer les tables
+    await createTables();
+    
+    // Étape 2: Vérifier si les données existent déjà
+    const checkData = () => {
+      return new Promise((resolve, reject) => {
+        db.get('SELECT COUNT(*) as count FROM patients', (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row.count);
+          }
+        });
+      });
+    };
 
-// Initialisation de la base de données
-const initDatabase = () => {
-  createTables();
-  
-  // Vérifier si les données existent déjà
-  db.get('SELECT COUNT(*) as count FROM patients', (err, row) => {
-    if (err) {
-      console.error('Erreur lors de la vérification:', err.message);
-    } else if (row.count === 0) {
+    const patientCount = await checkData();
+
+    if (patientCount === 0) {
       console.log('Insertion des données de test...');
-      insertTestData();
-      insertTestUsers();
+      await insertTestData();
+      await insertTestUsers();
       console.log('Données de test insérées avec succès');
     } else {
+      console.log(`${patientCount} patients trouvés dans la base de données`);
       console.log('Les données existent déjà dans la base');
     }
-  });
+
+  } catch (error) {
+    console.error('Erreur lors de l\'initialisation de la base de données:', error.message);
+  }
 };
 
 // Démarrage du serveur
