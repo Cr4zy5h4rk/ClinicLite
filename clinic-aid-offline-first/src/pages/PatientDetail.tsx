@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import pouchService from '@/services/pouchService';
 import { 
   ArrowLeft, 
   User, 
@@ -23,7 +24,8 @@ import {
   CheckCircle,
   Clock,
   Stethoscope,
-  Loader2
+  Loader2,
+  Database
 } from 'lucide-react';
 
 export default function PatientDetail() {
@@ -32,7 +34,7 @@ export default function PatientDetail() {
     getPatient,
     getAntecedents,
     getConsultationsByPatient,
-    getVaccinations,
+    getVaccinationsByPatient,
     getNotes,
     createAntecedent,
     createVaccination,
@@ -58,30 +60,59 @@ export default function PatientDetail() {
         // Charger les données du patient
         const patientData = await getPatient(id);
         setPatient(patientData);
+        console.log('Patient chargé:', patientData);
 
         // Charger les antécédents
-        const antecedentsData = await getAntecedents(id);
-        setAntecedents(antecedentsData);
+        try {
+          console.log('Chargement des antécédents pour le patient:', id);
+          const antecedentsData = await getAntecedents(id);
+          console.log('Antécédents chargés:', antecedentsData);
+          setAntecedents(antecedentsData);
+        } catch (antecedentErr) {
+          console.error('Erreur chargement antécédents:', antecedentErr);
+          setError('Erreur chargement antécédents: ' + antecedentErr.message);
+        }
 
         // Charger les consultations
-        const consultationsData = await getConsultationsByPatient(id);
-        setConsultations(consultationsData);
+        try {
+          console.log('Chargement des consultations pour le patient:', id);
+          const consultationsData = await getConsultationsByPatient(id);
+          console.log('Consultations chargées:', consultationsData);
+          setConsultations(consultationsData);
+        } catch (consultationErr) {
+          console.error('Erreur chargement consultations:', consultationErr);
+        }
 
         // Charger les vaccinations
-        const vaccinationsData = await getVaccinations(id);
-        setVaccinations(vaccinationsData);
+        try {
+          console.log('Chargement des vaccinations pour le patient:', id);
+          const vaccinationsData = await getVaccinationsByPatient(id);
+          console.log('Vaccinations chargées:', vaccinationsData);
+          setVaccinations(vaccinationsData);
+        } catch (vaccinationErr) {
+          console.error('Erreur chargement vaccinations:', vaccinationErr);
+          setError('Erreur chargement vaccinations: ' + vaccinationErr.message);
+        }
 
         // Charger les notes
-        const notesData = await getNotes(id);
-        setNotes(notesData);
+        try {
+          console.log('Chargement des notes pour le patient:', id);
+          const notesData = await getNotes(id);
+          console.log('Notes chargées:', notesData);
+          setNotes(notesData);
+        } catch (notesErr) {
+          console.error('Erreur chargement notes:', notesErr);
+          setError('Erreur chargement notes: ' + notesErr.message);
+        }
 
       } catch (err) {
+        console.error('Erreur générale:', err);
         setError(err.message);
       }
     };
 
     loadPatientData();
-  }, [id, getPatient, getAntecedents, getConsultationsByPatient, getVaccinations, getNotes]);
+  }, [id, getPatient, getAntecedents, getConsultationsByPatient, getVaccinationsByPatient, getNotes]);
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -116,7 +147,7 @@ export default function PatientDetail() {
       });
       
       // Recharger les vaccinations
-      const updatedVaccinations = await getVaccinations(id);
+      const updatedVaccinations = await getVaccinationsByPatient(id);
       setVaccinations(updatedVaccinations);
       
     } catch (err) {
@@ -280,6 +311,27 @@ export default function PatientDetail() {
               Nouvelle consultation
             </Button>
           </Link>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={async () => {
+              try {
+                await pouchService.createTestData(patient._id);
+                // Recharger les données
+                const antecedentsData = await getAntecedents(id);
+                setAntecedents(antecedentsData);
+                const vaccinationsData = await getVaccinationsByPatient(id);
+                setVaccinations(vaccinationsData);
+                alert('Données de test créées avec succès');
+              } catch (err) {
+                console.error('Erreur création données test:', err);
+                setError('Erreur création données test');
+              }
+            }}
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Créer données test
+          </Button>
         </div>
       </div>
 

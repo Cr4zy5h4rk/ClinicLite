@@ -17,8 +17,10 @@ import {
   X,
   WifiOff,
   Wifi,
-  LogOut
+  LogOut,
+  Trash2
 } from 'lucide-react';
+import pouchService from '@/services/pouchService';
 
 interface AppLayoutProps {
   children?: ReactNode;
@@ -49,6 +51,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { path: '/', icon: Home, label: 'Accueil', badge: null },
     { path: '/patients', icon: Users, label: 'Patients', badge: '24' },
     { path: '/consultations', icon: Stethoscope, label: 'Consultations', badge: null },
+    { path: '/Listconsultations', icon: Stethoscope, label: 'Liste des consultations', badge: null },
     { path: '/vaccinations', icon: Syringe, label: 'Vaccinations', badge: '3' },
     { path: '/assistant', icon: Brain, label: 'Assistant IA', badge: null },
     { path: '/sync', icon: RefreshCw, label: 'Synchronisation', badge: isOnline ? '' : '!' },
@@ -63,6 +66,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleForceFullSync = () => {
+    if (confirm("ATTENTION: Cette action va vider la base de données locale et recharger toutes les données depuis le serveur. Les données non synchronisées seront perdues. Voulez-vous continuer?")) {
+      pouchService.forceFullSync().then(() => {
+        alert("Synchronisation complète terminée avec succès.");
+      }).catch(error => {
+        console.error("Erreur lors de la synchronisation complète:", error);
+        alert("Erreur lors de la synchronisation complète. Consultez la console pour plus de détails.");
+      });
+    }
   };
 
   return (
@@ -102,7 +116,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </p>
           </div>
 
-          <nav className="mt-8 flex-1 px-2 space-y-1">
+          <nav className="mt-5 flex-1 px-2 space-y-1">
             {menuItems.map((item) => (
               <Link
                 key={item.path}
@@ -128,8 +142,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
             ))}
           </nav>
 
-          {/* Bouton de déconnexion */}
-          <div className="px-2 mt-auto pb-4">
+          {/* Boutons de déconnexion et sync forcée */}
+          <div className="px-2 mt-auto pb-4 space-y-2">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+              onClick={handleForceFullSync}
+              disabled={!isOnline}
+            >
+              <Trash2 className="mr-3 h-5 w-5" />
+              Forcer synchronisation
+            </Button>
+            
             <Button 
               variant="ghost" 
               className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -143,7 +167,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-50">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-10 bg-white border-b border-slate-200">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -182,7 +206,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
               )}
             </div>
           </div>
-          <nav className="px-2 space-y-1">
+          
+          <nav className="px-2 pt-2 pb-3 space-y-1">
             {menuItems.map((item) => (
               <Link
                 key={item.path}
@@ -208,6 +233,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </Link>
             ))}
             
+            {/* Bouton de synchronisation forcée mobile */}
+            <Button 
+              variant="outline" 
+              className="w-full justify-start text-amber-600 hover:text-amber-700 hover:bg-amber-50 mt-4 px-2 py-3"
+              onClick={handleForceFullSync}
+              disabled={!isOnline}
+            >
+              <Trash2 className="mr-3 h-6 w-6" />
+              Forcer synchronisation
+            </Button>
+            
             {/* Bouton de déconnexion mobile */}
             <Button 
               variant="ghost" 
@@ -223,13 +259,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main Content */}
       <div className="lg:pl-64 flex flex-col w-full">
-        {children}
         <main className="flex-1 pt-16 lg:pt-0">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <Outlet />
-            </div>
-          </div>
+          {children}
         </main>
       </div>
     </div>

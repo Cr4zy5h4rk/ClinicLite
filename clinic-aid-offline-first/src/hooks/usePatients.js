@@ -126,6 +126,18 @@ const loadPatients = useCallback(async () => {
       throw error;
     }
   }, []);
+  
+  // Créer une nouvelle consultation
+  const createConsultation = useCallback(async (consultationData) => {
+    try {
+      const newConsultation = await pouchService.createConsultation(consultationData);
+      await loadPatients(); // Recharger pour mettre à jour les compteurs
+      return newConsultation;
+    } catch (error) {
+      console.error('Erreur création consultation:', error);
+      throw error;
+    }
+  }, [loadPatients]);
 
   // Créer un nouvel antécédent
   const createAntecedent = useCallback(async (antecedentData) => {
@@ -142,6 +154,8 @@ const loadPatients = useCallback(async () => {
   // Récupérer les antécédents d'un patient
   const getAntecedents = useCallback(async (patientId) => {
     try {
+      console.log('Récupération des antécédents pour le patient:', patientId);
+      console.log('antecedents:', pouchService.getAntecedentsByPatient(patientId));
       return await pouchService.getAntecedentsByPatient(patientId);
     } catch (error) {
       console.error('Erreur récupération antécédents:', error);
@@ -167,6 +181,16 @@ const loadPatients = useCallback(async () => {
       return await pouchService.getVaccinationsByPatient(patientId);
     } catch (error) {
       console.error('Erreur récupération vaccinations:', error);
+      throw error;
+    }
+  }, []);
+
+  // Récupérer les consultations d'un patient
+  const getConsultationsByPatient = useCallback(async (patientId) => {
+    try {
+      return await pouchService.getConsultationsByPatient(patientId);
+    } catch (error) {
+      console.error('Erreur récupération consultations:', error);
       throw error;
     }
   }, []);
@@ -338,6 +362,8 @@ const loadPatients = useCallback(async () => {
     // Nouvelles actions
     createAntecedent,
     getAntecedents,
+    createConsultation,
+    getConsultationsByPatient,
     createVaccination,
     getVaccinationsByPatient,
     createNote,

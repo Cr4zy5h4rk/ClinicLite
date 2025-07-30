@@ -51,7 +51,7 @@ const useTinyLlamaIntegration = () => {
       throw new Error('TinyLlama not connected');
     }
 
-    // Prompt très simple pour TinyLlama
+    
     const prompt = `You are a medical assistant. Answer this medical question briefly: ${userMessage}`;
 
     try {

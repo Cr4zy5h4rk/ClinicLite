@@ -310,7 +310,7 @@ async checkAndRepairIndexes() {
       console.log('Rechargement forcé depuis le backend...');
       
       // Vider la base locale (optionnel - ou on peut juste marquer comme non-synced)
-      // await this.clearDB();
+      await this.clearDB();
       
       // Recharger depuis le backend
       await this.loadInitialDataFromBackend();
@@ -1193,6 +1193,20 @@ async ensureIndexes() {
           name: 'vaccination_by_patient_index'
         }
       },
+      // Add specific index for antecedents
+      { 
+        index: {
+          fields: ['type', 'patientId', 'date'],
+          name: 'antecedent_by_patient_index'
+        }
+      },
+      // Add specific index for notes
+      { 
+        index: {
+          fields: ['type', 'patientId', 'date'],
+          name: 'note_by_patient_index'
+        }
+      },
       { 
         index: {
           fields: ['type', 'email'],
@@ -1441,19 +1455,29 @@ async ensureIndexes() {
 
   async getConsultationsByPatient(patientId) {
     try {
+      console.log('Début getConsultationsByPatient pour', patientId);
       const result = await this.localDB.find({
         selector: { 
           type: 'consultation',
           patientId: patientId 
-        },
-        sort: [{ dateConsultation: 'desc' }]
+        }
       });
+      console.log('Résultat brut consultations:', result);
       
-      return result.docs.map(consultation => ({
+      // Manual sorting since we can't use sort without an index
+      const consultations = result.docs.sort((a, b) => {
+        return new Date(b.dateConsultation || b.date || 0) - new Date(a.dateConsultation || a.date || 0);
+      });
+      console.log('Consultations triées:', consultations);
+      
+      const formattedConsultations = consultations.map(consultation => ({
         ...consultation,
         id: consultation._id,
         status: this.getDocumentStatus(consultation)
       }));
+      console.log('Consultations formatées:', formattedConsultations);
+      
+      return formattedConsultations;
     } catch (error) {
       console.error('Erreur récupération consultations:', error);
       throw error;
@@ -1463,19 +1487,29 @@ async ensureIndexes() {
   // Méthodes pour les antécédents
   async getAntecedentsByPatient(patientId) {
     try {
+      console.log('Début getAntecedentsByPatient pour', patientId);
       const result = await this.localDB.find({
         selector: {
           type: 'antecedent',
           patientId: patientId
-        },
-        sort: [{ date: 'desc' }]
+        }
       });
+      console.log('Résultat brut antécédents:', result);
 
-      return result.docs.map(antecedent => ({
+      // Manual sorting since we can't use sort without an index
+      const antecedents = result.docs.sort((a, b) => {
+        return new Date(b.date || 0) - new Date(a.date || 0);
+      });
+      console.log('antecedents fonction:', antecedents);
+
+      const formattedAntecedents = antecedents.map(antecedent => ({
         ...antecedent,
         id: antecedent._id,
         status: this.getDocumentStatus(antecedent)
       }));
+      console.log('Antécédents formatés:', formattedAntecedents);
+
+      return formattedAntecedents;
     } catch (error) {
       console.error('Erreur récupération antécédents:', error);
       throw error;
@@ -1532,23 +1566,29 @@ async ensureIndexes() {
   // Méthodes pour les vaccinations
 async getVaccinationsByPatient(patientId) {
   try {
+    console.log('Début getVaccinationsByPatient pour', patientId);
     const result = await this.localDB.find({
       selector: {
         type: 'vaccination',
         patientId: patientId
       }
     });
+    console.log('Résultat brut vaccinations:', result);
 
     // Manual sorting since we can't use sort without an index
     const vaccinations = result.docs.sort((a, b) => {
-      return new Date(b.dateAdministration) - new Date(a.dateAdministration);
+      return new Date(b.dateAdministration || 0) - new Date(a.dateAdministration || 0);
     });
+    console.log('Vaccinations triées:', vaccinations);
 
-    return vaccinations.map(vaccination => ({
+    const formattedVaccinations = vaccinations.map(vaccination => ({
       ...vaccination,
       id: vaccination._id,
       status: this.getDocumentStatus(vaccination)
     }));
+    console.log('Vaccinations formatées:', formattedVaccinations);
+
+    return formattedVaccinations;
   } catch (error) {
     console.error('Error retrieving vaccinations:', error);
     
@@ -1559,8 +1599,10 @@ async getVaccinationsByPatient(patientId) {
           type: 'vaccination',
           patientId: patientId
         }
-      });const vaccinations = result.docs.sort((a, b) => {
-        return new Date(b.dateAdministration) - new Date(a.dateAdministration);
+      });
+      
+      const vaccinations = result.docs.sort((a, b) => {
+        return new Date(b.dateAdministration || 0) - new Date(a.dateAdministration || 0);
       });
 
       return vaccinations.map(vaccination => ({
@@ -1628,19 +1670,29 @@ async getVaccinationsByPatient(patientId) {
   // Méthodes pour les notes
   async getNotesByPatient(patientId) {
     try {
+      console.log('Début getNotesByPatient pour', patientId);
       const result = await this.localDB.find({
         selector: {
           type: 'note',
           patientId: patientId
-        },
-        sort: [{ date: 'desc' }]
+        }
       });
+      console.log('Résultat brut notes:', result);
 
-      return result.docs.map(note => ({
+      // Manual sorting since we can't use sort without an index
+      const notes = result.docs.sort((a, b) => {
+        return new Date(b.date || 0) - new Date(a.date || 0);
+      });
+      console.log('Notes triées:', notes);
+
+      const formattedNotes = notes.map(note => ({
         ...note,
         id: note._id,
         status: this.getDocumentStatus(note)
       }));
+      console.log('Notes formatées:', formattedNotes);
+
+      return formattedNotes;
     } catch (error) {
       console.error('Erreur récupération notes:', error);
       throw error;
@@ -1729,6 +1781,117 @@ async getVaccinationsByPatient(patientId) {
       console.log('Base de données fermée');
     } catch (error) {
       console.error('Erreur fermeture DB:', error);
+    }
+  }
+
+  // Méthode pour forcer la synchronisation complète (vider DB locale et recharger)
+  async forceFullSync() {
+    try {
+      console.log('Synchronisation complète forcée...');
+      
+      // Vider la base locale
+      await this.clearDB();
+      
+      // Recharger depuis le backend
+      await this.loadInitialDataFromBackend();
+      
+      // Synchroniser à nouveau
+      await this.syncWithBackend();
+      
+      console.log('Synchronisation complète forcée terminée avec succès');
+      return true;
+    } catch (error) {
+      console.error('Erreur synchronisation complète forcée:', error);
+      return false;
+    }
+  }
+  
+  // Méthode pour créer des données de test (vaccinations et antécédents)
+  async createTestData(patientId) {
+    try {
+      console.log('Création de données de test pour le patient:', patientId);
+      
+      // Créer des vaccinations de test
+      const vaccinations = [
+        {
+          _id: this.generateId('vaccination'),
+          type: 'vaccination',
+          patientId: patientId,
+          vaccin: 'COVID-19',
+          lot: 'LOT123456',
+          dateAdministration: new Date().toISOString(),
+          prochainRappel: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+          administrePar: 'Dr. Kouassi',
+          reactions: 'Aucune',
+          status: 'à jour',
+          syncStatus: 'pending',
+          createdAt: new Date().toISOString()
+        },
+        {
+          _id: this.generateId('vaccination'),
+          type: 'vaccination',
+          patientId: patientId,
+          vaccin: 'Tétanos',
+          lot: 'LOT789012',
+          dateAdministration: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+          prochainRappel: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          administrePar: 'Dr. Diallo',
+          reactions: 'Légère douleur au site d\'injection',
+          status: 'retard',
+          syncStatus: 'pending',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      
+      // Créer des antécédents de test
+      const antecedents = [
+        {
+          _id: this.generateId('antecedent'),
+          type: 'antecedent',
+          patientId: patientId,
+          type: 'Médical',
+          description: 'Hypertension artérielle',
+          date: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+          syncStatus: 'pending',
+          createdAt: new Date().toISOString()
+        },
+        {
+          _id: this.generateId('antecedent'),
+          type: 'antecedent',
+          patientId: patientId,
+          type: 'Chirurgical',
+          description: 'Appendicectomie',
+          date: new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString(),
+          syncStatus: 'pending',
+          createdAt: new Date().toISOString()
+        },
+        {
+          _id: this.generateId('antecedent'),
+          type: 'antecedent',
+          patientId: patientId,
+          type: 'Allergique',
+          description: 'Allergie à la pénicilline',
+          date: new Date().toISOString(),
+          syncStatus: 'pending',
+          createdAt: new Date().toISOString()
+        }
+      ];
+      
+      // Ajouter les vaccinations
+      for (const vaccination of vaccinations) {
+        await this.localDB.put(vaccination);
+      }
+      
+      // Ajouter les antécédents
+      for (const antecedent of antecedents) {
+        await this.localDB.put(antecedent);
+      }
+      
+      console.log('Données de test créées avec succès');
+      return true;
+    } catch (error) {
+      console.error('Erreur création données de test:', error);
+      return false;
     }
   }
 
