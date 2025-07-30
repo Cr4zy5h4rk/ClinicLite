@@ -104,11 +104,10 @@ export default function Patients() {
   console.log('Filtered patients:', filteredPatients);
 }, [patients, filteredPatients]);
 
-  // Filtrer les patients
   useEffect(() => {
     let filtered = patients;
 
-    // Filtrer par terme de recherche
+    
     if (searchTerm) {
       filtered = patients.filter(patient => 
         patient.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -118,12 +117,12 @@ export default function Patients() {
       );
     }
 
-    // Filtrer par sexe
+    
     if (filterSex !== 'all') {
       filtered = filtered.filter(patient => patient.sexe === filterSex);
     }
 
-    // Filtrer par statut
+    
     if (filterStatus !== 'all') {
       filtered = filtered.filter(patient => patient.status === filterStatus);
     }

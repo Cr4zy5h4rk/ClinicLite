@@ -248,7 +248,6 @@ export default function Login() {
         {/* Footer */}
         <div className="text-center text-xs text-slate-500 space-y-1">
           <p>ClinicLite v1.0 - Système médical pour centres de santé ruraux</p>
-          <p>© 2024 - Développé pour l'Afrique avec ❤️</p>
         </div>
       </div>
     </div>
