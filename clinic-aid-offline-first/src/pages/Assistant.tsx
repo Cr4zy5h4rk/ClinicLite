@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,8 +67,7 @@ const useTinyLlamaIntegration = () => {
           options: {
             temperature: 0.3,
             top_p: 0.8,
-            max_tokens: 300,
-            stop: ['\n\n']
+            max_tokens: 2048
           }
         })
       });
@@ -237,6 +236,11 @@ export default function MedicalAssistant() {
     generateTinyLlamaResponse 
   } = useTinyLlamaIntegration();
   
+  useEffect(() => {
+    connectToTinyLlama();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [currentConversation, setCurrentConversation] = useState<Message[]>([
     {
       id: '1',
