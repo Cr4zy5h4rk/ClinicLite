@@ -1,0 +1,79 @@
+
+services:
+  backend:
+    image: cr4zy5h4rk/cliniclite-backend:latest
+    container_name: clinicLite-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-your_default_jwt_secret}
+    volumes:
+      - ./backend/hospital.db:/app/hospital.db
+      - ./backend/uploads:/app/uploads
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    image: cr4zy5h4rk/cliniclite-frontend:latest
+    container_name: clinicLite-frontend
+    environment:
+      - VITE_API_URL=http://backend:3000
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  ollama-setup:
+    image: alpine:latest
+    container_name: clinicLite-ollama-setup
+    depends_on:
+      ollama:
+        condition: service_started
+    command: >
+      sh -c "
+        apk add --no-cache curl &&
+        echo 'Waiting for Ollama to be ready...' &&
+        sleep 10 &&
+        curl -X POST http://ollama:11434/api/pull -d '{\"name\":\"tinyllama\"}' -H 'Content-Type: application/json' &&
+        echo 'TinyLlama model installed successfully'
+      "
+    networks:
+      - default
+    restart: "no"
+
+  ollama:
+    image: ollama/ollama
+    container_name: clinicLite-ollama
+    ports:
+      - "11434:11434"
+    # volumes:
+    #   - ./ollama/models:/root/.ollama
+    environment:
+      - OLLAMA_MODELS=/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+
+networks:
+  default:
+    name: clinicLite-network
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local
+  uploads:
+    driver: local
